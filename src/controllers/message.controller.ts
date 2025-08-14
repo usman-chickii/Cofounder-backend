@@ -7,18 +7,33 @@ import {
 
 export const getMessages = async (req: Request, res: Response) => {
   const { projectId } = req.params;
-  const messages = await getMessagesByProjectDB(projectId);
-  res.status(200).json(messages);
+  try {
+    const messages = await getMessagesByProjectDB(projectId);
+    if (!messages || messages.length === 0) {
+      return res.status(404).json({ message: "No messages found" });
+    }
+    res.status(200).json(messages);
+  } catch (error) {
+    res.status(500).json({ message: "Failed to get messages" });
+  }
 };
 
 export const addMessage = async (req: Request, res: Response) => {
   const { projectId, role, content } = req.body;
-  const message = await addMessageDB(projectId, role, content);
-  res.status(201).json(message);
+  try {
+    const message = await addMessageDB(projectId, role, content);
+    res.status(201).json(message);
+  } catch (error) {
+    res.status(500).json({ message: "Failed to add message" });
+  }
 };
 
 export const deleteMessage = async (req: Request, res: Response) => {
   const { messageId } = req.params;
-  const message = await deleteMessageDB(messageId);
-  res.status(200).json(message);
+  try {
+    const message = await deleteMessageDB(messageId);
+    res.status(200).json(message);
+  } catch (error) {
+    res.status(500).json({ message: "Failed to delete message" });
+  }
 };

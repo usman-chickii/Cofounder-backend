@@ -4,13 +4,17 @@ import { ENV } from "./config/env";
 import { errorHandler } from "./middleware/errorHandler.middleware";
 import { checkDatabaseConnection } from "./database/init";
 import messageRouter from "./routes/message.router";
+import projectRouter from "./routes/project.router";
+import { apiLimiter } from "./middleware/rateLimit.middleware";
 
 const app = express();
 
 app.use(cors());
 app.use(express.json());
+app.use(apiLimiter); // Rate limit for all the API requests, but can be set for individual routes as well later on
 
 app.use("/api/messages", messageRouter);
+app.use("/api/projects", projectRouter);
 
 app.get("/", (req, res) => {
   res.send("Testing default route");
