@@ -6,15 +6,21 @@ import { checkDatabaseConnection } from "./database/init";
 import messageRouter from "./routes/message.router";
 import projectRouter from "./routes/project.router";
 import { apiLimiter } from "./middleware/rateLimit.middleware";
+import authRouter from "./routes/auth.router";
+import cookieParser from "cookie-parser";
+import profileRouter from "./routes/profile.router";
 
 const app = express();
 
-app.use(cors());
+app.use(cors({ origin: "http://localhost:8080", credentials: true }));
+app.use(cookieParser());
 app.use(express.json());
-app.use(apiLimiter); // Rate limit for all the API requests, but can be set for individual routes as well later on
+// app.use(apiLimiter); // Rate limit for all the API requests, but can be set for individual routes as well later on
 
+app.use("/api/auth", authRouter);
 app.use("/api/messages", messageRouter);
 app.use("/api/projects", projectRouter);
+app.use("/api/profile", profileRouter);
 
 app.get("/", (req, res) => {
   res.send("Testing default route");
