@@ -4,18 +4,32 @@ import {
   getProjectByIdDB,
   createProjectDB,
   deleteProjectDB,
+  getAllProjectsDBWithLimit,
 } from "../services/project.service";
 import { validate as isUuid } from "uuid";
 import { ProjectCreateInput } from "../types/project";
 
 export const getProjects = async (req: Request, res: Response) => {
-  // TODO: Add auth middleware
-  const userId = "78479c75-0f06-45cb-b823-89d60781bef3"; // will have to add auth middleware and add req.user.id
+  const userId = (req as any).user.id;
   try {
     const projects = await getAllProjectsDB(userId);
     if (!projects) {
       return res.status(404).json({ message: "No projects found" });
     }
+    res.status(200).json(projects);
+  } catch (error) {
+    res.status(500).json({ message: "Failed to get projects" });
+  }
+};
+
+export const getProjectsWithLimit = async (req: Request, res: Response) => {
+  const userId = (req as any).user.id;
+  console.log("userId from getProjectsWithLimit is:", userId);
+  console.log("req.query from getProjectsWithLimit is:", req.query);
+  const limit = req.query.limit ? parseInt(req.query.limit as string) : 10;
+  console.log("limit from getProjectsWithLimit is:", limit);
+  try {
+    const projects = await getAllProjectsDBWithLimit(userId, limit);
     res.status(200).json(projects);
   } catch (error) {
     res.status(500).json({ message: "Failed to get projects" });
@@ -39,8 +53,8 @@ export const getProjectById = async (req: Request, res: Response) => {
 };
 
 export const createProject = async (req: Request, res: Response) => {
-  const { name, description, status = "in_progress" } = req.body;
-  const userId = "78479c75-0f06-45cb-b823-89d60781bef3"; // will have to add auth middleware and add req.user.id
+  const { name, description, status = "In Progress" } = req.body;
+  const userId = (req as any).user.id;
   const newProject: ProjectCreateInput = {
     name,
     description,

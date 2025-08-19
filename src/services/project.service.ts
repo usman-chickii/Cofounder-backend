@@ -12,6 +12,22 @@ export async function getAllProjectsDB(userId: string): Promise<Project[]> {
   return data || [];
 }
 
+export async function getAllProjectsDBWithLimit(
+  userId: string,
+  limit: number
+): Promise<Project[]> {
+  console.log("userId from getAllProjectsDBWithLimit is:", userId);
+  const { data, error } = await supabase
+    .from("projects")
+    .select("*")
+    .eq("user_id", userId)
+    .limit(limit)
+    .order("created_at", { ascending: false });
+
+  if (error) throw error;
+  return data || [];
+}
+
 // Get project by ID
 export async function getProjectByIdDB(
   projectId: string

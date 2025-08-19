@@ -4,15 +4,23 @@ import {
   createProject,
   deleteProject,
   getProjectById,
+  getProjectsWithLimit,
 } from "../controllers/project.controller";
 import { validateRequest } from "../middleware/validateRequest.middleware";
 import { createProjectSchema } from "../validation/projectSchema";
+import { authMiddleware } from "../middleware/auth.middleware";
 
 const router = Router();
 
-router.get("/", getProjects);
-router.get("/:projectId", getProjectById);
-router.post("/", validateRequest(createProjectSchema), createProject);
+router.get("/", authMiddleware, getProjects);
+router.get("/recent", authMiddleware, getProjectsWithLimit);
+router.get("/:projectId", authMiddleware, getProjectById);
+router.post(
+  "/",
+  authMiddleware,
+  validateRequest(createProjectSchema),
+  createProject
+);
 router.delete("/:projectId", deleteProject);
 
 export default router;

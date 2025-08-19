@@ -79,3 +79,27 @@ export const me = async (req: Request, res: Response) => {
     res.status(401).json({ user: null });
   }
 };
+
+export const oAuthSync = async (req: Request, res: Response) => {
+  const { accessToken, refreshToken } = req.body;
+  console.log("access_token from sync function is:", accessToken);
+  console.log("refresh_token from sync function is:", refreshToken);
+  console.log(req.body);
+  if (!accessToken || !refreshToken) {
+    return res.status(400).json({ message: "Missing access or refresh token" });
+  }
+  const user = await authService.getUserFromToken(accessToken);
+  console.log("user from sync function is:", user);
+  if (!user) {
+    return res.status(401).json({ message: "User not found" });
+  }
+
+  const cookieOptions: CookieOptions = {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "strict",
+  };
+  res.cookie("sb-access-token", accessToken, cookieOptions);
+  res.cookie("sb-refresh-token", refreshToken, cookieOptions);
+  res.status(200).json({ message: "User logged in successfully", user: user });
+};

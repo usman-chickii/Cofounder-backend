@@ -14,6 +14,5 @@ export const authMiddleware = async (
     return res.status(401).json({ message: "Unauthorized" });
   }
   (req as any).user = data.user;
-  console.log(data.user);
   next();
 };
