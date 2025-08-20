@@ -3,7 +3,7 @@ export interface Project {
   user_id: string; // FK to profiles table
   name: string;
   description: string;
-  status: "in_progress" | "completed";
+  status: "In Progress" | "Completed";
   created_at: string; // Supabase timestamp
 }
 

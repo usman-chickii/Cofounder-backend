@@ -4,7 +4,8 @@ export const getMessagesByProjectDB = async (projectId: string) => {
   const { data, error } = await supabase
     .from("messages")
     .select("*")
-    .eq("project_id", projectId);
+    .eq("project_id", projectId)
+    .order("created_at", { ascending: true });
 
   if (error) {
     throw new Error(error.message);

@@ -1,7 +1,7 @@
 export interface Message {
   id?: string; // Supabase auto-generated
   projectId: string; // foreign key to Project
-  role: "user" | "assistant"; // "user" or "assistant"
+  role: "user" | "assistant" | "system"; // "user" or "assistant"
   content: string; // message text
   createdAt?: string; // Supabase auto-generated timestamp
 }

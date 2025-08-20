@@ -9,9 +9,7 @@ export const getMessages = async (req: Request, res: Response) => {
   const { projectId } = req.params;
   try {
     const messages = await getMessagesByProjectDB(projectId);
-    if (!messages || messages.length === 0) {
-      return res.status(404).json({ message: "No messages found" });
-    }
+
     res.status(200).json(messages);
   } catch (error) {
     res.status(500).json({ message: "Failed to get messages" });

@@ -9,6 +9,7 @@ import { apiLimiter } from "./middleware/rateLimit.middleware";
 import authRouter from "./routes/auth.router";
 import cookieParser from "cookie-parser";
 import profileRouter from "./routes/profile.router";
+import chatRouter from "./routes/chat.router";
 
 const app = express();
 
@@ -21,6 +22,7 @@ app.use("/api/auth", authRouter);
 app.use("/api/messages", messageRouter);
 app.use("/api/projects", projectRouter);
 app.use("/api/profile", profileRouter);
+app.use("/api/chat", chatRouter);
 
 app.get("/", (req, res) => {
   res.send("Testing default route");

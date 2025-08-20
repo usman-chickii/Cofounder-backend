@@ -3,13 +3,18 @@ import { Project, ProjectCreateInput } from "../types/project";
 
 // Get all projects for a user
 export async function getAllProjectsDB(userId: string): Promise<Project[]> {
-  const { data, error } = await supabase
-    .from("projects")
-    .select("*")
-    .eq("user_id", userId);
+  try {
+    const { data, error } = await supabase
+      .from("projects")
+      .select("*")
+      .eq("user_id", userId);
 
-  if (error) throw error;
-  return data || [];
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.log(error);
+    throw error;
+  }
 }
 
 export async function getAllProjectsDBWithLimit(
@@ -55,8 +60,9 @@ export async function createProjectDB(
     .insert(project)
     .select()
     .single();
+  console.log(error);
 
-  if (error) throw error;
+  if (error) throw error.message;
   return data;
 }
 

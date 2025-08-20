@@ -11,6 +11,7 @@ import { ProjectCreateInput } from "../types/project";
 
 export const getProjects = async (req: Request, res: Response) => {
   const userId = (req as any).user.id;
+
   try {
     const projects = await getAllProjectsDB(userId);
     if (!projects) {
@@ -55,16 +56,19 @@ export const getProjectById = async (req: Request, res: Response) => {
 export const createProject = async (req: Request, res: Response) => {
   const { name, description, status = "In Progress" } = req.body;
   const userId = (req as any).user.id;
+  console.log("userId from createProject is:", userId);
   const newProject: ProjectCreateInput = {
     name,
     description,
     status,
     user_id: userId,
   };
+  console.log("newProject from createProject is:", newProject);
   try {
     const project = await createProjectDB(newProject);
     res.status(201).json(project);
   } catch (error) {
+    console.error("Error creating project:", error);
     res.status(500).json({ message: "Failed to create project" });
   }
 };
