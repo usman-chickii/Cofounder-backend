@@ -14,6 +14,22 @@ export const getMessagesByProjectDB = async (projectId: string) => {
   return data;
 };
 
+export const getRecentMessagesByProjectDB = async (
+  projectId: string,
+  limit: number = 10
+) => {
+  const { data, error } = await supabase
+    .from("messages")
+    .select("*")
+    .eq("project_id", projectId)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (error) {
+    throw new Error(error.message);
+  }
+  return data;
+};
+
 export const addMessageDB = async (
   projectId: string,
   role: string,

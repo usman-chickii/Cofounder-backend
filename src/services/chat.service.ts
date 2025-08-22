@@ -1,6 +1,7 @@
-import { addMessageDB } from "./message.service";
+import { addMessageDB, getRecentMessagesByProjectDB } from "./message.service";
 import { Response } from "express";
 import { openai } from "../config/openAI";
+import { retryWithBackoff } from "../utils/retry";
 
 export const chatService = async (projectId: string, content: string) => {
   const userMessage = await addMessageDB(projectId, "user", content);
@@ -36,23 +37,40 @@ export const chatStreamService = async (
 
   const systemPrompt = `You are a helpful assistant that helps users define their software project requirements.`;
 
-  const completion = await openai.chat.completions.create({
-    model,
-    messages: [
-      { role: "system", content: systemPrompt },
-      { role: "user", content },
-    ],
-    stream: true,
-  });
+  const recentMessages = await getRecentMessagesByProjectDB(projectId, 10);
+  // Ensure messages are in chronological order and include roles for the OpenAI API
+  const historyMessages = [...recentMessages].reverse().map((message) => ({
+    role: message.role as "user" | "assistant" | "system",
+    content: message.content,
+  }));
+
+  const completion = await retryWithBackoff(() =>
+    openai.chat.completions.create({
+      model,
+      messages: [{ role: "system", content: systemPrompt }, ...historyMessages],
+      stream: true,
+    })
+  );
 
   let assistantMessage = "";
 
-  for await (const chunk of completion) {
-    const delta = chunk.choices[0]?.delta?.content;
-    if (delta) {
-      assistantMessage += delta;
-      res.write(`data: ${JSON.stringify({ token: delta })}\n\n`);
+  try {
+    for await (const chunk of completion) {
+      const delta = chunk.choices[0]?.delta?.content;
+      if (delta) {
+        assistantMessage += delta;
+        res.write(`data: ${JSON.stringify({ token: delta })}\n\n`);
+      }
     }
+  } catch (error) {
+    console.error(error);
+    res.write(
+      `data: ${JSON.stringify({
+        event: "error",
+        message: "AI failed to respond. Please try again.",
+      })}\n\n`
+    );
+    res.end();
   }
 
   const savedAssistantMessage = await addMessageDB(

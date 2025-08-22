@@ -19,7 +19,13 @@ export const chatStream = async (req: Request, res: Response) => {
   } catch (error) {
     console.error(error);
     if (!res.headersSent) {
-      res.status(500).json({ error: "Streaming failed" });
+      res.write(
+        `data: ${JSON.stringify({
+          event: "error",
+          message: "AI failed to respond. Please try again.",
+        })}\n\n`
+      );
+      res.end();
     }
   }
 };

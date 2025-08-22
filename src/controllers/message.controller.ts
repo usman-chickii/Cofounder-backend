@@ -3,6 +3,7 @@ import {
   addMessageDB,
   deleteMessageDB,
   getMessagesByProjectDB,
+  getRecentMessagesByProjectDB,
 } from "../services/message.service";
 
 export const getMessages = async (req: Request, res: Response) => {
