@@ -75,3 +75,42 @@ export async function deleteProjectDB(projectId: string): Promise<void> {
 
   if (error) throw error;
 }
+
+export async function generateDocumentService(
+  projectId: string
+): Promise<{ url: string }> {
+  const project = await getProjectByIdDB(projectId);
+  if (!project) {
+    throw new Error("Project not found");
+  }
+  console.log(`Generating BRD for project ${projectId}...`);
+  const dummyMarkdown = `
+  # Business Requirement Document
+  
+  ## Introduction
+  This is a dummy BRD generated for testing.
+  
+  ## Goals
+  - Goal 1
+  - Goal 2
+  
+  ## Requirements
+  1. Requirement A
+  2. Requirement B
+    `;
+  const { data, error } = await supabase
+    .from("project_blocks")
+    .insert({
+      project_id: projectId,
+      type: "brd",
+      title: "Business Requirement Document",
+      summary: "This is a dummy BRD generated for testing.",
+      status: "draft",
+      content: dummyMarkdown,
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}

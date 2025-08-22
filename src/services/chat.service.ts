@@ -2,6 +2,7 @@ import { addMessageDB, getRecentMessagesByProjectDB } from "./message.service";
 import { Response } from "express";
 import { openai } from "../config/openAI";
 import { retryWithBackoff } from "../utils/retry";
+import { ENV } from "../config/env";
 
 export const chatService = async (projectId: string, content: string) => {
   const userMessage = await addMessageDB(projectId, "user", content);
@@ -15,12 +16,6 @@ export const chatService = async (projectId: string, content: string) => {
   );
 
   return { userMessage, assistantMessage };
-  // const response = await generateResponse(userMessage);
-  // const assistantMessage = await addMessageDB(response);
-  // res.json({
-  //     userMessage,
-  //     assistantMessage
-  // });
 };
 
 export const chatStreamService = async (
@@ -49,6 +44,7 @@ export const chatStreamService = async (
       model,
       messages: [{ role: "system", content: systemPrompt }, ...historyMessages],
       stream: true,
+      max_tokens: Number(ENV.LLM_MAX_TOKENS),
     })
   );
 

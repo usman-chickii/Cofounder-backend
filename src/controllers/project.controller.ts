@@ -5,6 +5,7 @@ import {
   createProjectDB,
   deleteProjectDB,
   getAllProjectsDBWithLimit,
+  generateDocumentService,
 } from "../services/project.service";
 import { validate as isUuid } from "uuid";
 import { ProjectCreateInput } from "../types/project";
@@ -80,5 +81,17 @@ export const deleteProject = async (req: Request, res: Response) => {
     res.status(200).json(project);
   } catch (error) {
     res.status(500).json({ message: "Failed to delete project" });
+  }
+};
+
+export const generateDocument = async (req: Request, res: Response) => {
+  try {
+    const { projectId } = req.params;
+    const document = await generateDocumentService(projectId);
+    console.log("document from generateDocument is:", document);
+
+    res.status(200).json(document);
+  } catch (error) {
+    res.status(500).json({ message: "Failed to generate document" });
   }
 };

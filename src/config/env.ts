@@ -8,6 +8,7 @@ export const ENV = {
   NODE_ENV: process.env.NODE_ENV || "development",
   PORT: process.env.PORT || 3001,
   DEFAULT_LLM_PROVIDER: process.env.DEFAULT_LLM_PROVIDER || "groq",
+  LLM_MAX_TOKENS: process.env.LLM_MAX_TOKENS || 200,
   SUPABASE_URL: process.env.SUPABASE_URL,
   SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
   SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY,

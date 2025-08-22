@@ -5,6 +5,7 @@ import {
   deleteProject,
   getProjectById,
   getProjectsWithLimit,
+  generateDocument,
 } from "../controllers/project.controller";
 import { validateRequest } from "../middleware/validateRequest.middleware";
 import { createProjectSchema } from "../validation/projectSchema";
@@ -21,6 +22,7 @@ router.post(
   validateRequest(createProjectSchema),
   createProject
 );
+router.post("/:projectId/generate-document", authMiddleware, generateDocument);
 router.delete("/:projectId", deleteProject);
 
 export default router;
