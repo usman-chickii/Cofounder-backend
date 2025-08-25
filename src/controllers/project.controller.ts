@@ -5,10 +5,11 @@ import {
   createProjectDB,
   deleteProjectDB,
   getAllProjectsDBWithLimit,
-  generateDocumentService,
 } from "../services/project.service";
 import { validate as isUuid } from "uuid";
 import { ProjectCreateInput } from "../types/project";
+import { getProjectBlocksDB } from "../services/projectBlock.service";
+import { generateDocumentService } from "../services/document.service";
 
 export const getProjects = async (req: Request, res: Response) => {
   const userId = (req as any).user.id;
@@ -93,5 +94,15 @@ export const generateDocument = async (req: Request, res: Response) => {
     res.status(200).json(document);
   } catch (error) {
     res.status(500).json({ message: "Failed to generate document" });
+  }
+};
+
+export const getProjectBlocks = async (req: Request, res: Response) => {
+  const { projectId } = req.params;
+  try {
+    const blocks = await getProjectBlocksDB(projectId);
+    res.status(200).json(blocks);
+  } catch (error) {
+    res.status(500).json({ message: "Failed to get project blocks" });
   }
 };

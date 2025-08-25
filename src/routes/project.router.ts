@@ -6,10 +6,15 @@ import {
   getProjectById,
   getProjectsWithLimit,
   generateDocument,
+  getProjectBlocks,
 } from "../controllers/project.controller";
 import { validateRequest } from "../middleware/validateRequest.middleware";
 import { createProjectSchema } from "../validation/projectSchema";
 import { authMiddleware } from "../middleware/auth.middleware";
+import {
+  downloadDocument,
+  saveDocumentInProjectBlock,
+} from "../controllers/document.controller";
 
 const router = Router();
 
@@ -23,6 +28,13 @@ router.post(
   createProject
 );
 router.post("/:projectId/generate-document", authMiddleware, generateDocument);
+router.get("/:projectId/documents/:blockId/download", downloadDocument);
+router.post(
+  "/:projectId/documents/save-block",
+  authMiddleware,
+  saveDocumentInProjectBlock
+);
+router.get("/:projectId/blocks", authMiddleware, getProjectBlocks);
 router.delete("/:projectId", deleteProject);
 
 export default router;
