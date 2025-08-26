@@ -5,102 +5,114 @@ import {
 } from "./projectBlock.service";
 import { supabase } from "../config/supabase";
 import { generatePdf } from "../utils/generatePdf";
+import { getProjectState } from "./state.service";
+import { openai } from "../config/openAI";
 
-export async function generateDocumentService(
-  projectId: string
-): Promise<{ markdown: string }> {
-  const project = await getProjectByIdDB(projectId);
-  if (!project) {
-    throw new Error("Project not found");
-  }
-  console.log(`Generating BRD for project ${projectId}...`);
-  const dummyMarkdown: string = `
-# Business Requirement Document (BRD)
+// export async function generateDocumentService( //old working dummy markdown function
+//   projectId: string
+// ): Promise<{ markdown: string }> {
+//   const project = await getProjectByIdDB(projectId);
+//   if (!project) {
+//     throw new Error("Project not found");
+//   }
+//   console.log(`Generating BRD for project ${projectId}...`);
+//   const dummyMarkdown: string = `
+// # Business Requirement Document (BRD)
 
-## 1. Executive Summary
-This document outlines the business requirements for the development of the new web-based project management platform, **ProjectX**. The platform aims to streamline collaboration, task tracking, and reporting across multiple teams.
+// ## 1. Executive Summary
+// This document outlines the business requirements for the development of the new web-based project management platform, **ProjectX**. The platform aims to streamline collaboration, task tracking, and reporting across multiple teams.
 
-## 2. Project Overview
-**Project Name:** ProjectX  
-**Project Manager:** Jane Doe  
-**Sponsor:** John Smith  
+// ## 2. Project Overview
+// **Project Name:** ProjectX
+// **Project Manager:** Jane Doe
+// **Sponsor:** John Smith
 
-### 2.1 Background
-Current project management tools lack integration with internal reporting systems and have limited automation features. This leads to inefficiencies and increased manual effort.
+// ### 2.1 Background
+// Current project management tools lack integration with internal reporting systems and have limited automation features. This leads to inefficiencies and increased manual effort.
 
-### 2.2 Objectives
-- Improve task tracking and reporting efficiency.
-- Enable real-time collaboration among team members.
-- Provide analytics dashboards for management.
-- Integrate with existing internal tools.
+// ### 2.2 Objectives
+// - Improve task tracking and reporting efficiency.
+// - Enable real-time collaboration among team members.
+// - Provide analytics dashboards for management.
+// - Integrate with existing internal tools.
 
-## 3. Stakeholders
-| Role | Name | Responsibility |
-|------|------|----------------|
-| Project Sponsor | John Smith | Approves budgets and timelines |
-| Product Owner | Jane Doe | Defines requirements and priorities |
-| Development Team | Team A | Develops platform features |
-| QA Team | Team B | Ensures quality and compliance |
+// ## 3. Stakeholders
+// | Role | Name | Responsibility |
+// |------|------|----------------|
+// | Project Sponsor | John Smith | Approves budgets and timelines |
+// | Product Owner | Jane Doe | Defines requirements and priorities |
+// | Development Team | Team A | Develops platform features |
+// | QA Team | Team B | Ensures quality and compliance |
 
-## 4. Functional Requirements
-### 4.1 User Management
-- Ability to create, update, and delete user accounts.
-- Role-based access control:
-  - Admin
-  - Manager
-  - Team Member
-- User authentication via OAuth2 and SSO.
+// ## 4. Functional Requirements
+// ### 4.1 User Management
+// - Ability to create, update, and delete user accounts.
+// - Role-based access control:
+//   - Admin
+//   - Manager
+//   - Team Member
+// - User authentication via OAuth2 and SSO.
 
-### 4.2 Task Management
-- Create, assign, update, and delete tasks.
-- Task prioritization (High, Medium, Low).
-- Task dependencies and notifications.
-- Task search and filter functionality.
+// ### 4.2 Task Management
+// - Create, assign, update, and delete tasks.
+// - Task prioritization (High, Medium, Low).
+// - Task dependencies and notifications.
+// - Task search and filter functionality.
 
-### 4.3 Reporting & Analytics
-- Dashboard with project KPIs.
-- Export reports in PDF and Excel formats.
-- Customizable charts and graphs.
-- Automated weekly summary emails.
+// ### 4.3 Reporting & Analytics
+// - Dashboard with project KPIs.
+// - Export reports in PDF and Excel formats.
+// - Customizable charts and graphs.
+// - Automated weekly summary emails.
 
-### 4.4 Integration
-- Integration with internal CRM system.
-- Integration with messaging apps (Slack, Teams).
-- API access for third-party tools.
+// ### 4.4 Integration
+// - Integration with internal CRM system.
+// - Integration with messaging apps (Slack, Teams).
+// - API access for third-party tools.
 
-## 5. Non-Functional Requirements
-- **Performance:** Page load time < 2 seconds.
-- **Scalability:** Support up to 10,000 concurrent users.
-- **Security:** Data encryption at rest and in transit, audit logs.
-- **Availability:** 99.9% uptime SLA.
-- **Maintainability:** Modular architecture, well-documented code.
+// ## 5. Non-Functional Requirements
+// - **Performance:** Page load time < 2 seconds.
+// - **Scalability:** Support up to 10,000 concurrent users.
+// - **Security:** Data encryption at rest and in transit, audit logs.
+// - **Availability:** 99.9% uptime SLA.
+// - **Maintainability:** Modular architecture, well-documented code.
 
-## 6. Assumptions & Constraints
-- Users will have modern browsers (Chrome, Edge, Safari, Firefox).
-- Platform will support English language only initially.
-- Budget and timeline constraints may limit feature scope.
-  
-## 7. Glossary
-- **BRD:** Business Requirement Document  
-- **KPI:** Key Performance Indicator  
-- **SLA:** Service Level Agreement  
-  
-## 8. Approval
-| Name | Role | Signature | Date |
-|------|------|-----------|------|
-| John Smith | Project Sponsor | __________ | ____/____/____ |
-| Jane Doe | Product Owner | __________ | ____/____/____ |
-  `.trim();
-  // const block = await createProjectBlock(projectId, {
-  //   project_id: projectId,
-  //   type: "brd",
-  //   title: "Business Requirement Document",
-  //   summary: "This is a dummy BRD generated for testing.",
-  //   status: "draft",
-  //   content: dummyMarkdown,
-  // });
+// ## 6. Assumptions & Constraints
+// - Users will have modern browsers (Chrome, Edge, Safari, Firefox).
+// - Platform will support English language only initially.
+// - Budget and timeline constraints may limit feature scope.
 
-  return { markdown: dummyMarkdown };
+// ## 7. Glossary
+// - **BRD:** Business Requirement Document
+// - **KPI:** Key Performance Indicator
+// - **SLA:** Service Level Agreement
+
+// ## 8. Approval
+// | Name | Role | Signature | Date |
+// |------|------|-----------|------|
+// | John Smith | Project Sponsor | __________ | ____/____/____ |
+// | Jane Doe | Product Owner | __________ | ____/____/____ |
+//   `.trim();
+
+//   return { markdown: dummyMarkdown };
+// }
+
+export async function generateDocumentService(projectId: string) {
+  const { metadata } = await getProjectState(projectId);
+  const prompt = `Create a clear, well-structured BRD in Markdown using only the provided metadata. 
+Metadata JSON: ${JSON.stringify(metadata)}
+Include Executive Summary, Requirements, Market & Competitive Analysis, and Risks. Keep it factual.`;
+
+  const completion = await openai.chat.completions.create({
+    model: "gpt-3.5-turbo",
+    messages: [{ role: "user", content: prompt }],
+    temperature: 0.2,
+  });
+
+  const markdown =
+    completion.choices[0].message.content || "# BRD\n\nNo content.";
+  console.log(markdown);
+  return { markdown };
 }
 
 export async function downloadDocumentService(
