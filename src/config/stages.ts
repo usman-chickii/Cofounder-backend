@@ -3,11 +3,13 @@ import { StageId, ProjectMetadata } from "../types/stage";
 type FieldPath =
   | keyof NonNullable<ProjectMetadata["idea_refinement"]>
   | keyof NonNullable<ProjectMetadata["market_analysis"]>
-  | keyof NonNullable<ProjectMetadata["competitive_analysis"]>;
+  | keyof NonNullable<ProjectMetadata["competitive_analysis"]>
+  | keyof NonNullable<ProjectMetadata["product_definition"]>
+  | keyof NonNullable<ProjectMetadata["project_constraints"]>;
 
 export interface StageDefinition {
   id: StageId;
-  requiredPaths: string[]; // e.g. ["idea_refinement.idea", "idea_refinement.problem_statement"]
+  requiredPaths: string[];
   questionTemplate: (missing: string[], meta: ProjectMetadata) => string;
   next?: StageId;
 }
@@ -31,6 +33,7 @@ Let's focus on the most critical one first. ${
       }`,
     next: "market_analysis",
   },
+
   market_analysis: {
     id: "market_analysis",
     requiredPaths: [
@@ -45,6 +48,7 @@ Let's focus on the most critical one first. ${
       )}. What's your input for the first one?`,
     next: "competitive_analysis",
   },
+
   competitive_analysis: {
     id: "competitive_analysis",
     requiredPaths: [
@@ -57,8 +61,39 @@ Let's focus on the most critical one first. ${
       `Competitive Analysis: I still need ${missing.join(
         ", "
       )}. Let's fill them one by one.`,
+    next: "product_definition",
+  },
+
+  product_definition: {
+    id: "product_definition",
+    requiredPaths: [
+      "product_definition.core_features",
+      "product_definition.user_workflows",
+      "product_definition.data_types",
+      "product_definition.integration_requirements",
+    ],
+    questionTemplate: (missing) =>
+      `Product Definition: I still need ${missing.join(
+        ", "
+      )}. Let's start with the most important — what are the core features of your product?`,
+    next: "project_constraints",
+  },
+
+  project_constraints: {
+    id: "project_constraints",
+    requiredPaths: [
+      "project_constraints.timeline",
+      "project_constraints.budget_tier",
+      "project_constraints.team_size",
+      "project_constraints.technical_complexity_preference",
+    ],
+    questionTemplate: (missing) =>
+      `Project Constraints: Please specify ${missing.join(
+        ", "
+      )}. For example, what's your expected timeline and budget tier?`,
     next: "brd_ready",
   },
+
   brd_ready: {
     id: "brd_ready",
     requiredPaths: [],

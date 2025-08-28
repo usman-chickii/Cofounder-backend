@@ -6,6 +6,7 @@ import type {
   ChatCompletionMessageParam,
   ChatCompletionTool,
 } from "openai/resources/chat/completions";
+import { ENV } from "../config/env";
 import { getRecentMessagesByProjectDB } from "./message.service";
 
 type ExtractFnArgs = {
@@ -48,49 +49,39 @@ export async function handleTurn(
 
   // Compute missing fields
   const missing = missingPaths(state.metadata, stageDef.requiredPaths);
-
   const system = `
-  You are a helpful requirements assistant helping collect structured metadata. 
-  You have three tools available: extract_stage_updates, suggest_field_values, and save_metadata.
-  Follow these exact rules when deciding to call them:
-
-  If the user gives explicit new information → call extract_stage_updates.
-  If user is missing info and needs help → call suggest_field_values.
-  If user accepts or confirms something → call save_metadata.
-
-  If the user gives explicit new information → call extract_stage_updates.
+  You are a helpful requirements assistant helping collect structured metadata for startup projects.
   
-  1. **If the user provides explicit new information** (e.g., “the target audience is students” or “problems are formatting and tailoring”):
-     - Acknowledge conversationally in natural language (summarize/rephrase).
-     - Immediately call **save_metadata** with the confirmed fields.
+  🔑 General Rules:
+  - Always keep answers conversational and natural.
+  - Always provide a natural language response, even if you also call a tool to extract structured updates.
+  - Never output raw metadata keys; describe them in user-friendly terms.
+  - When summarizing user input, rephrase or improve wording so it’s clear and polished.
+  - Ask about only one missing field at a time, in plain English.
+  - If the user says they don't know a field, optionally provide helpful insights or suggestions.
   
-  2. **If the user agrees, confirms, or refers to earlier content** (e.g., “yes, that’s fine”, “the problems you mentioned”, “same as above”):
-     - Resolve the reference into explicit text from conversation history.
-     - Then immediately call **save_metadata** with the resolved fields.
+  📥 If the user provides clear metadata (e.g., “the target audience is …”), you must BOTH:
+    (a) Acknowledge it conversationally in natural language, and
+    (b) Immediately call the tool with the structured data update —
+      always saving it into the correct stage (even if the user is currently in another stage).
+  - Never skip step (b). Narration or summarization is not a substitute for the tool call.
   
-  3. **If the user asks for ideas, inspiration, or says they don’t know** (e.g., “you decide”, “can you suggest?”, “I’m not sure”):
-     - Call **suggest_field_values** with thoughtful possible values for the missing fields.
-     - DO NOT save yet. Wait for explicit user confirmation before calling save_metadata.
+  💡 When the user asks you to suggest (e.g., "I don’t know, can you suggest?"):
+  - Only propose ideas in natural language and wait for confirmation.
+  - Do NOT call tools until the user confirms.
+  - After confirmation (e.g., "yes, that works"), then call the tool with structured data.
+  - If the user edits your suggestion, update it and then call the tool.
   
-  4. **If there is information to extract but the stage is unclear or ambiguous**:
-     - Call **extract_stage_updates** to map the information into structured fields.
+  📊 Stage & Metadata Rules:
+  - Each project has multiple stages (idea_refinement, problem_statement, market_analysis, competitor_analysis, branding_foundation, ui_preferences, tech_stack, etc.).
+  - Always capture and save user input into the correct stage field.
+  - If the user provides information belonging to a different stage than the current one, update that stage instead of the current one.
+  - When suggesting values, only propose options relevant to the requested stage.
+  - Never overwrite unrelated stages.
+  - If unsure which stage a detail belongs to, politely ask the user for clarification.
   
-  5. Always respond in natural, conversational English even when calling a tool.
-     - Example: “Got it — your target audience is recent graduates. I’ll save that.” (then call save_metadata).
-  
-  6. Only ever call ONE tool per turn.
-     - save_metadata → when user provides or confirms values.
-     - suggest_field_values → when user asks for ideas/help deciding.
-     - extract_stage_updates → only if stage is ambiguous or data is partial.
-  
-  7. When some fields are missing:
-     - Briefly summarize what is saved so far.
-     - Ask about only one missing field at a time in plain English (never show raw field names).
-     - If the user says they don’t know, propose suggestions (via suggest_field_values).
-  
-  8. Never output raw metadata keys to the user. Use plain human-friendly terms (e.g., “unique value proposition” instead of \`unique_value_proposition\`).
-  
-  The goal: Collect complete metadata smoothly by mixing natural conversation with structured tool calls.
+  📋 Missing Data Handling:
+  - When some fields are missing, respond with a summary of what’s already saved and a clear list of what’s missing.
   `;
 
   const messages: ChatCompletionMessageParam[] = [
@@ -113,7 +104,7 @@ User says: "${userText}"`,
       function: {
         name: "extract_stage_updates",
         description:
-          "Extract fields relevant to the current stage from the user’s message. If the user refers to, agrees with, or summarizes information already discussed in the conversation (e.g., “the problems you mentioned” or “yes, that’s fine”), resolve those references into explicit text and extract accordingly. Always prefer structured extraction over skipping. Only skip if there is truly no relevant information at all.",
+          "Extract user-provided details and map them to the correct stage and field. Always ensure values are stored in their correct stage, even if the conversation is currently in another stage.",
         parameters: {
           type: "object",
           properties: {
@@ -148,62 +139,28 @@ User says: "${userText}"`,
                     barriers_to_entry: { type: "string" },
                   },
                 },
+                product_definition: {
+                  type: "object",
+                  properties: {
+                    core_features: { type: "string" },
+                    user_workflows: { type: "string" },
+                    data_types: { type: "string" },
+                    integration_requirements: { type: "string" },
+                  },
+                },
+                project_constraints: {
+                  type: "object",
+                  properties: {
+                    timeline: { type: "string" },
+                    budget_tier: { type: "string" },
+                    team_size: { type: "string" },
+                    technical_complexity_preference: { type: "string" },
+                  },
+                },
               },
-              additionalProperties: false,
             },
           },
           required: ["updates"],
-        },
-      },
-    },
-    {
-      type: "function",
-      function: {
-        name: "suggest_field_values",
-        description:
-          "Suggest possible values for missing fields in the current stage. Used when the user asks for ideas, inspiration, or says things like 'you decide' or 'suggest something'. Do NOT save automatically.",
-        parameters: {
-          type: "object",
-          properties: {
-            stage: {
-              type: "string",
-              description:
-                "The current stage of the project (e.g., idea_refinement, market_analysis, competitive_analysis, etc.)",
-            },
-            suggestions: {
-              type: "object",
-              description: "Suggestions for relevant fields in this stage",
-              additionalProperties: {
-                type: "array",
-                items: { type: "string" },
-              },
-            },
-          },
-          required: ["stage", "suggestions"],
-        },
-      },
-    },
-    {
-      type: "function",
-      function: {
-        name: "save_metadata",
-        description:
-          "Save confirmed metadata fields for the current stage. Used when the user explicitly provides values, or confirms a suggested value. Always save exactly what the user confirms.",
-        parameters: {
-          type: "object",
-          properties: {
-            stage: {
-              type: "string",
-              description:
-                "The current stage of the project (e.g., idea_refinement, market_analysis, competitive_analysis, etc.)",
-            },
-            fields: {
-              type: "object",
-              description: "Confirmed metadata fields to save",
-              additionalProperties: { type: "string" },
-            },
-          },
-          required: ["stage", "fields"],
         },
       },
     },
@@ -221,9 +178,6 @@ User says: "${userText}"`,
   // Apply tool outputs if present (deep merge)
   const choice = completion.choices[0];
   console.log("choice", choice);
-  if (choice.message?.tool_calls?.length) {
-    console.log("tool_calls", choice.message?.tool_calls);
-  }
   console.log(choice.message?.content);
   let newMeta = { ...(state.metadata || {}) } as ProjectMetadata;
 

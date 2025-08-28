@@ -99,25 +99,96 @@ import { openai } from "../config/openAI";
 
 export async function generateDocumentService(projectId: string) {
   const { metadata } = await getProjectState(projectId);
-  const prompt = `
-You are a technical business analyst creating development-ready documentation. Transform all previous insights into actionable specifications.
+  const prompt = `You are a senior technical business analyst creating a Business Requirements Document (BRD) that will be used to generate JIRA development tasks.
+  Input: A metadata JSON containing structured business information about the project.
+  Metadata JSON: ${JSON.stringify(metadata)}
 
-Metadata JSON: ${JSON.stringify(metadata)}
+  
+  **CRITICAL OBJECTIVE**: Generate a BRD detailed enough for developers to immediately start creating user stories and technical tasks in JIRA.
 
-**Read from metadata:** Access ALL previous stage data to compile comprehensive documentation
 
-Generate:
-- Business Requirements Document (BRD) with:
-  - Executive summary (from all stages)
-  - Functional requirements (user stories format)
-  - Non-functional requirements (performance, security, compliance)
-  - Success metrics and KPIs
-  - Risk assessment
-- User journey maps for primary personas
-- Data model requirements
-- Integration requirements (third-party services, APIs)
+  **Read from metadata:** Access ALL previous stage data to compile comprehensive documentation
 
-Output: Well-structured BRD in Markdown using only the provided metadata. ready for technical review, with requirements prioritized using MoSCoW method.`;
+
+  **Technical Inference Guidelines:**
+  - From business workflows → infer required system components and data flows
+  - From target audience and scale → determine performance and security requirements
+  - From competitive analysis → identify feature complexity and technical challenges
+  - From pricing strategy → infer payment processing and user management needs
+  - From market size → determine scalability and infrastructure requirements
+
+
+
+  **Output Format:** A comprehensive, development-ready BRD in **Markdown**.
+
+  ## Document Structure
+  1. **Executive Summary**
+     - Project overview, vision, market opportunity
+     - **Technology approach summary** (inferred from complexity)
+  2. **Problem Statement & Solution**
+     - Clear problem definition and proposed solution
+  3. **Market Analysis**
+     - Target audience, market size, competitive landscape
+  4. **Product Specifications**
+     - **Core Features List** (prioritized table with MoSCoW)
+     - **User Workflows** (detailed step-by-step processes)
+     - **Business Logic Rules** (calculations, validations, decision points)
+  5. **System Architecture**
+     - **High-level Architecture** (inferred system components)
+     - **Technology Stack Recommendations** (based on complexity and scale)
+     - **Third-party Integrations** (inferred from business needs)
+  6. **Technical Requirements**
+     - **Functional Requirements**: Detailed user stories with acceptance criteria (MoSCoW table)
+     - **Non-functional Requirements**: Performance, scalability, security (specific metrics)
+     - **API Requirements**: Key endpoints needed (inferred from workflows)
+  7. **Data Architecture**
+     - **Entities and Relationships** (inferred from business processes)
+     - **Data Validation Rules**
+     - **Data Security Requirements**
+  8. **Security & Compliance**
+     - Authentication and authorization needs
+     - Data privacy requirements
+     - Regulatory compliance (if applicable)
+  9. **Integration Requirements**
+     - Payment gateways, external APIs, notification systems
+     - Data import/export needs
+  10. **User Experience Requirements**
+      - Key user journeys and interaction patterns
+      - Mobile/responsive considerations
+  11. **Development Phases**
+      - **MVP Features** (Phase 1)
+      - **Enhanced Features** (Phase 2+)
+      - **Dependencies and Prerequisites**
+  12. **Success Metrics & KPIs**
+      - Business metrics and technical performance indicators
+  13. **Risk Assessment**
+      - Technical risks, business risks, and mitigation strategies
+
+  ---
+
+  **Enhanced Instructions for Technical Sections:**
+  **For Functional Requirements:**
+  - Convert each business capability into specific user stories
+  - Include acceptance criteria for each story
+  - Estimate complexity (Simple/Medium/Complex)
+  - Group related stories into epics
+  **For System Architecture:**
+  - Infer system components from user workflows
+  - Suggest appropriate technology stack based on scale and complexity
+  - Identify required integrations from business processes
+  **For Data Model:**
+  - Extract entities from business processes and user workflows
+  - Define relationships between entities
+  - Include data validation and business rules
+  **Constraints:**
+  - Use ONLY the metadata as the source of truth
+  - Make intelligent technical inferences from business context
+  - Every section must be actionable for development planning
+  - Include specific, measurable requirements where possible
+  - The final BRD must be ready for immediate JIRA task creation
+
+  **Quality Check:**
+  Ask yourself: "Could a development team use this BRD to immediately start sprint planning and task creation?" If not, add more technical detail.`;
 
   const completion = await openai.chat.completions.create({
     model: "gpt-4o-mini",
