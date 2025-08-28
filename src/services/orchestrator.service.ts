@@ -11,6 +11,7 @@ import { getRecentMessagesByProjectDB } from "./message.service";
 
 type ExtractFnArgs = {
   updates: ProjectMetadata;
+  userMessage: string;
 };
 
 function setDeep(obj: any, path: string, value: any) {
@@ -54,7 +55,10 @@ export async function handleTurn(
   
   🔑 General Rules:
   - Always keep answers conversational and natural.
-  - Always provide a natural language response, even if you also call a tool to extract structured updates.
+  - Every time the user provides metadata, you must produce BOTH:
+      (a) a natural language acknowledgement, AND
+      (b) a tool call in the same turn.
+  - Do not wait for additional confirmation before calling the tool, unless the user explicitly says ‘suggest’ or ‘I’m not sure.’
   - Never output raw metadata keys; describe them in user-friendly terms.
   - When summarizing user input, rephrase or improve wording so it’s clear and polished.
   - Ask about only one missing field at a time, in plain English.
@@ -104,10 +108,14 @@ User says: "${userText}"`,
       function: {
         name: "extract_stage_updates",
         description:
-          "Extract user-provided details and map them to the correct stage and field. Always ensure values are stored in their correct stage, even if the conversation is currently in another stage.",
+          "Extract user-provided details and map them to the correct stage and field. Always ensure values are stored in their correct stage, even if the conversation is currently in another stage. Also give a natural language explanation of the update for the user. It should be stored in the userMessage field.",
         parameters: {
           type: "object",
           properties: {
+            stage: {
+              type: "string",
+              description: "The stage these updates belong to",
+            },
             updates: {
               type: "object",
               properties: {
@@ -159,8 +167,13 @@ User says: "${userText}"`,
                 },
               },
             },
+            userMessage: {
+              type: "string",
+              description:
+                "A natural-language explanation of the update for the user. Should reference the updated fields directly, e.g. 'Got it — I’ve noted your {field} is {value}' or 'Understood, I’ve updated {field} to {value}'.",
+            },
           },
-          required: ["updates"],
+          required: ["stage", "updates", "userMessage"],
         },
       },
     },
@@ -217,9 +230,11 @@ User says: "${userText}"`,
       )
       .join("\n");
 
-    assistantTextFromTool = pretty
-      ? `Got it — I’ve saved the following:\n${pretty}`
-      : undefined;
+    console.log("tool call", choice.message?.tool_calls);
+
+    assistantTextFromTool =
+      args.userMessage ??
+      (pretty ? `Got it — I’ve saved the following:\n${pretty}` : undefined);
   }
   // Recompute missing fields
   const remainingMissing = missingPaths(newMeta, stageDef.requiredPaths);
