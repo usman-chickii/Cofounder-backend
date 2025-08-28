@@ -99,12 +99,28 @@ import { openai } from "../config/openAI";
 
 export async function generateDocumentService(projectId: string) {
   const { metadata } = await getProjectState(projectId);
-  const prompt = `Create a clear, well-structured BRD in Markdown using only the provided metadata. 
+  const prompt = `
+You are a technical business analyst creating development-ready documentation. Transform all previous insights into actionable specifications.
+
 Metadata JSON: ${JSON.stringify(metadata)}
-Include Executive Summary, Requirements, Market & Competitive Analysis, and Risks. Keep it factual.`;
+
+**Read from metadata:** Access ALL previous stage data to compile comprehensive documentation
+
+Generate:
+- Business Requirements Document (BRD) with:
+  - Executive summary (from all stages)
+  - Functional requirements (user stories format)
+  - Non-functional requirements (performance, security, compliance)
+  - Success metrics and KPIs
+  - Risk assessment
+- User journey maps for primary personas
+- Data model requirements
+- Integration requirements (third-party services, APIs)
+
+Output: Well-structured BRD in Markdown using only the provided metadata. ready for technical review, with requirements prioritized using MoSCoW method.`;
 
   const completion = await openai.chat.completions.create({
-    model: "gpt-3.5-turbo",
+    model: "gpt-4o-mini",
     messages: [{ role: "user", content: prompt }],
     temperature: 0.2,
   });

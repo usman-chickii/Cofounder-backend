@@ -85,7 +85,7 @@ export const chatService = async (projectId: string, content: string) => {
 export const chatStreamService = async (
   projectId: string,
   content: string,
-  model: string = "gpt-3.5-turbo",
+  model: string = "gpt-4o-mini",
   res: Response
 ) => {
   const userMessage = await addMessageDB(projectId, "user", content);

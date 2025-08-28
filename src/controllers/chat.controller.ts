@@ -15,7 +15,7 @@ export const chatStream = async (req: Request, res: Response) => {
   const projectId = req.params.projectId;
   const { message } = req.body;
   try {
-    await chatStreamService(projectId, message, "gpt-3.5-turbo", res);
+    await chatStreamService(projectId, message, "gpt-4o-mini", res);
   } catch (error) {
     console.error(error);
     if (!res.headersSent) {
