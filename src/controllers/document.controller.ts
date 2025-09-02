@@ -18,6 +18,7 @@ export async function saveDocumentInProjectBlock(req: Request, res: Response) {
   try {
     const { projectId } = req.params;
     const { markdown, title = "Business Requirement Document" } = req.body;
+    console.log("markdown before saving in project block", markdown);
 
     const block = await createProjectBlock(projectId, {
       project_id: projectId,

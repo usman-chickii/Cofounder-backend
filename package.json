@@ -19,6 +19,7 @@
     "typescript": "^5.9.2"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.17.4",
     "@supabase/supabase-js": "^2.55.0",
     "@types/cors": "^2.8.19",
     "@types/dotenv": "^8.2.3",

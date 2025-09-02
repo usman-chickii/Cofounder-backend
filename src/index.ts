@@ -10,6 +10,8 @@ import authRouter from "./routes/auth.router";
 import cookieParser from "cookie-parser";
 import profileRouter from "./routes/profile.router";
 import chatRouter from "./routes/chat.router";
+import jiraRouter from "./routes/jira.router";
+import mcpRouter from "./routes/mcp.router";
 
 const app = express();
 
@@ -23,6 +25,8 @@ app.use("/api/messages", messageRouter);
 app.use("/api/projects", projectRouter);
 app.use("/api/profile", profileRouter);
 app.use("/api/chat", chatRouter);
+app.use("/api/jira", jiraRouter);
+app.use("/api/mcp", mcpRouter);
 
 app.get("/", (req, res) => {
   res.send("Testing default route");

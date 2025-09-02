@@ -6,12 +6,15 @@ import type {
   ChatCompletionMessageParam,
   ChatCompletionTool,
 } from "openai/resources/chat/completions";
-import { ENV } from "../config/env";
 import { getRecentMessagesByProjectDB } from "./message.service";
+import { callMcpTool, listMcpTools } from "./mcp.service";
+import { mapMcpToolToOpenAITool } from "../utils/mapMcpToOpenAi";
 
 type ExtractFnArgs = {
+  stage: StageId;
   updates: ProjectMetadata;
   userMessage: string;
+  nextStep: string;
 };
 
 function setDeep(obj: any, path: string, value: any) {
@@ -42,7 +45,8 @@ function missingPaths(meta: ProjectMetadata, required: string[]) {
 export async function handleTurn(
   projectId: string,
   userText: string,
-  model: string
+  model: string,
+  userId: string
 ) {
   const state = await getProjectState(projectId);
   const stageDef = STAGES[state.stage as StageId] ?? STAGES.idea_refinement;
@@ -52,12 +56,18 @@ export async function handleTurn(
   const missing = missingPaths(state.metadata, stageDef.requiredPaths);
   const system = `
   You are a helpful requirements assistant helping collect structured metadata for startup projects.
+  You are also integrated with JIRA through MCP tools.
   
   🔑 General Rules:
   - Always keep answers conversational and natural.
   - Every time the user provides metadata, you must produce BOTH:
       (a) a natural language acknowledgement, AND
       (b) a tool call in the same turn.
+  - For Jira-related user requests (e.g., "create a Jira issue", "assign a bug", "show me my tasks"):
+      (a) Call the correct Jira MCP tool instead of replying only in text.
+      (b) If required fields are missing (like project key, issue type, assignee), politely ask for them before making the tool call.
+      (c) Only call Jira tools when the user explicitly asks for Jira actions. 
+
   - Do not wait for additional confirmation before calling the tool, unless the user explicitly says ‘suggest’ or ‘I’m not sure.’
   - Never output raw metadata keys; describe them in user-friendly terms.
   - When summarizing user input, rephrase or improve wording so it’s clear and polished.
@@ -101,8 +111,13 @@ Current metadata: ${JSON.stringify(state.metadata)}
 User says: "${userText}"`,
     },
   ];
+  const mcpTools = await listMcpTools(userId);
 
+  const openAiTools: ChatCompletionTool[] = mcpTools.map(
+    mapMcpToolToOpenAITool
+  );
   const tools: ChatCompletionTool[] = [
+    ...openAiTools,
     {
       type: "function",
       function: {
@@ -172,8 +187,13 @@ User says: "${userText}"`,
               description:
                 "A natural-language explanation of the update for the user. Should reference the updated fields directly, e.g. 'Got it — I’ve noted your {field} is {value}' or 'Understood, I’ve updated {field} to {value}'.",
             },
+            nextStep: {
+              type: "string",
+              description:
+                "A natural suggestion for what the user can do next, based on the current context. For example: 'Would you like to define success metrics next?' or 'Now that we know the target audience, shall we explore the market size?'",
+            },
           },
-          required: ["stage", "updates", "userMessage"],
+          required: ["stage", "updates", "userMessage", "nextStep"],
         },
       },
     },
@@ -189,8 +209,44 @@ User says: "${userText}"`,
   });
 
   // Apply tool outputs if present (deep merge)
+  // const choice = completion.choices[0];
+
   const choice = completion.choices[0];
+
+  // 🚀 Execute any tool calls returned by the LLM
+  if (choice.message?.tool_calls) {
+    console.log("choice.message.tool_calls", choice.message.tool_calls);
+    for (const toolCall of choice.message.tool_calls) {
+      // Narrow: we only care about function calls
+      if (toolCall.type === "function") {
+        const fn = toolCall.function;
+        try {
+          const args = JSON.parse(fn.arguments || "{}");
+          console.log(`🔧 Calling MCP tool: ${fn.name} with`, args);
+
+          // Execute via MCP
+          const result = await callMcpTool(userId, fn.name, args);
+          console.log(
+            "MCP tool error details:",
+            JSON.stringify(result, null, 2)
+          );
+
+          // Optionally feed result back to conversation
+          messages.push({
+            role: "tool",
+            tool_call_id: toolCall.id,
+            content: JSON.stringify(result),
+          });
+        } catch (err) {
+          console.error(`❌ Failed to call tool ${fn.name}`, err);
+        }
+      }
+    }
+  }
+
+  const choice1 = completion.choices[0].message.tool_calls;
   console.log("choice", choice);
+  console.log("choice1", choice1);
   console.log(choice.message?.content);
   let newMeta = { ...(state.metadata || {}) } as ProjectMetadata;
 
@@ -211,13 +267,13 @@ User says: "${userText}"`,
 
   if (call?.["function"]?.arguments) {
     const args = JSON.parse(call["function"].arguments) as ExtractFnArgs;
+    console.log("args", args);
 
     // Deep merge
-    for (const [stageKey, fields] of Object.entries(args.updates)) {
-      if (fields && typeof fields === "object") {
-        for (const [fieldKey, val] of Object.entries(fields)) {
-          setDeep(newMeta, `${stageKey}.${fieldKey}`, val);
-        }
+    if (args.stage && args.updates) {
+      for (const [fieldKey, val] of Object.entries(args.updates)) {
+        console.log("setting", `${args.stage}.${fieldKey}`, val);
+        setDeep(newMeta, `${args.stage}.${fieldKey}`, val);
       }
     }
 
@@ -232,9 +288,14 @@ User says: "${userText}"`,
 
     console.log("tool call", choice.message?.tool_calls);
 
+    const toolMessages = [args.userMessage, args.nextStep].filter(Boolean);
+
     assistantTextFromTool =
-      args.userMessage ??
-      (pretty ? `Got it — I’ve saved the following:\n${pretty}` : undefined);
+      toolMessages.length > 0
+        ? toolMessages.join("\n\n")
+        : pretty
+        ? `Got it — I’ve saved the following:\n${pretty}`
+        : undefined;
   }
   // Recompute missing fields
   const remainingMissing = missingPaths(newMeta, stageDef.requiredPaths);

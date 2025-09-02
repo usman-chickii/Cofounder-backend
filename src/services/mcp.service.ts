@@ -1,0 +1,237 @@
+// src/services/mcp.service.ts
+import fetch from "node-fetch";
+import { ENV } from "../config/env";
+
+const MCP_SERVER_URL = ENV.MCP_SERVER_URL || "http://localhost:9000/mcp";
+
+// Keep track of active MCP sessions
+const mcpSessions: Record<string, { sessionId: string }> = {};
+
+// --- Helpers ---
+
+async function parseSSEOrJSON(response: any): Promise<any> {
+  const contentType = response.headers?.get?.("content-type") || "";
+  if (!contentType.includes("text/event-stream")) {
+    if (!response.ok) {
+      const text = await response.text().catch(() => "");
+      throw new Error(
+        `HTTP ${response.status} ${response.statusText}: ${text}`
+      );
+    }
+    return response.json();
+  }
+
+  if (!response.ok) {
+    const text = await response.text().catch(() => "");
+    throw new Error(`HTTP ${response.status} ${response.statusText}: ${text}`);
+  }
+
+  let buffer = "";
+  let lastJSON: any = undefined;
+
+  const stream: AsyncIterable<Buffer | string> = response.body as any;
+  for await (const chunk of stream) {
+    buffer += chunk.toString();
+    let idx: number;
+    while ((idx = buffer.indexOf("\n\n")) >= 0) {
+      const rawEvent = buffer.slice(0, idx);
+      buffer = buffer.slice(idx + 2);
+
+      const dataLines = rawEvent
+        .split("\n")
+        .filter((l) => l.startsWith("data:"))
+        .map((l) => l.slice(5).trim());
+
+      if (dataLines.length > 0) {
+        const dataPayload = dataLines.join("\n");
+        try {
+          const parsed = JSON.parse(dataPayload);
+          lastJSON = parsed;
+        } catch {
+          // ignore non-JSON frames
+        }
+      }
+    }
+  }
+
+  if (lastJSON === undefined) {
+    const maybeData = buffer
+      .split("\n")
+      .filter((l) => l.startsWith("data:"))
+      .map((l) => l.slice(5).trim())
+      .join("\n");
+    if (maybeData) {
+      try {
+        lastJSON = JSON.parse(maybeData);
+      } catch {
+        // ignore
+      }
+    }
+  }
+
+  if (lastJSON === undefined) {
+    throw new Error("No JSON payload found in SSE stream");
+  }
+  return lastJSON;
+}
+
+async function mcpPost(
+  payload: Record<string, any>,
+  sessionId?: string
+): Promise<any> {
+  const response = await fetch(MCP_SERVER_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(sessionId ? { "MCP-Session-Id": sessionId } : {}),
+      Accept: "application/json, text/event-stream",
+    },
+    body: JSON.stringify(payload),
+  });
+  const sessionIdResponse = response.headers.get("MCP-Session-Id");
+
+  const result = await parseSSEOrJSON(response);
+  if (!sessionIdResponse) {
+    throw new Error("MCP Session ID not found");
+  }
+  return { result, sessionId: sessionIdResponse };
+}
+
+// Fire-and-forget notification (no JSON-RPC id)
+async function mcpNotify(
+  method: string,
+  params: Record<string, any> = {},
+  sessionId?: string
+): Promise<void> {
+  const resp = await fetch(MCP_SERVER_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(sessionId ? { "MCP-Session-Id": sessionId } : {}),
+      Accept: "application/json, text/event-stream",
+    },
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      method,
+      params,
+    }),
+  });
+
+  // Consume body to completion but ignore content/parsing
+  try {
+    await resp.text();
+  } catch {
+    // ignore
+  }
+}
+
+// --- Public API ---
+
+/**
+ * Ensure a session exists for a user/chatbot session.
+ * Initializes a session with the MCP server if none exists.
+ */
+export async function ensureMcpSession(userId: string): Promise<string> {
+  if (mcpSessions[userId]) {
+    return mcpSessions[userId].sessionId;
+  }
+
+  const result = await mcpPost({
+    jsonrpc: "2.0",
+    id: 1,
+    method: "initialize",
+    params: {},
+  });
+
+  const sessionId = result?.result?.sessionId || result?.sessionId || undefined;
+
+  if (!sessionId) {
+    console.log("Failed to initialize MCP session (no sessionId)");
+    throw new Error("Failed to initialize MCP session (no sessionId)");
+  }
+
+  mcpSessions[userId] = { sessionId };
+  console.log("logging the error", result.result.error);
+
+  if (result?.result?.error?.code === -32602) {
+    console.log("MCP tools listed in listMcpTools failed, retrying");
+    //   await mcpNotify("notifications/initialize", {}, sessionId);
+    await mcpNotify("notifications/initialized", {}, sessionId);
+    return sessionId;
+  }
+
+  // Atlassian MCP expects a notifications handshake after initialize
+  //   await mcpNotify("notifications/initialize", {}, sessionId);
+  // If your server expects the LSP-like name instead, uncomment:
+  // await mcpNotify("notifications/initialized", {}, sessionId);
+
+  return sessionId;
+}
+
+/**
+ * Call a tool on the MCP server.
+ */
+export async function callMcpTool(
+  userId: string,
+  tool: string,
+  args: Record<string, any>
+): Promise<any> {
+  const sessionId = await ensureMcpSession(userId);
+  console.log("args in mcp function", args);
+
+  const result = await mcpPost(
+    {
+      jsonrpc: "2.0",
+      id: 1,
+      method: "tools/call",
+      params: {
+        name: tool,
+        arguments: args,
+      },
+    },
+    sessionId
+  );
+
+  return result?.result?.content ?? result?.result ?? result;
+}
+
+/**
+ * List available tools on the MCP server for this session.
+ */
+export async function listMcpTools(userId: string): Promise<any> {
+  const sessionId = await ensureMcpSession(userId);
+
+  try {
+    const result = await mcpPost(
+      {
+        jsonrpc: "2.0",
+        id: 1,
+        method: "tools/list",
+        params: {},
+      },
+      sessionId
+    );
+    // console.log("MCP tools listed in listMcpTools", result.result.result.tools);
+    return result.result.result.tools;
+  } catch (e: any) {
+    console.log("MCP tools listed in listMcpTools failed", e);
+    // If initialization notification wasn’t seen yet, send it and retry once
+
+    throw e;
+  }
+}
+
+/**
+ * Optional: Reset session if needed (e.g., user logs out)
+ */
+export function resetMcpSession(userId: string) {
+  delete mcpSessions[userId];
+}
+
+/**
+ * Get the current MCP session id for a user (for debugging).
+ */
+export function getMcpSessionId(userId: string): string | undefined {
+  console.log("Getting MCP session id for user", userId, mcpSessions[userId]);
+  return mcpSessions[userId]?.sessionId;
+}

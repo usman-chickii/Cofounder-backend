@@ -14,4 +14,6 @@ export const ENV = {
   SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY,
   GROQ_API_KEY: process.env.GROQ_API_KEY,
   OPENAI_API_KEY: process.env.OPENAI_API_KEY,
+  MCP_SERVER_URL: process.env.MCP_SERVER_URL,
+  MCP_SESSION_ID: process.env.MCP_SESSION_ID,
 };
