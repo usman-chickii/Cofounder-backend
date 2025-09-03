@@ -216,6 +216,7 @@ User says: "${userText}"`,
   // 🚀 Execute any tool calls returned by the LLM
   if (choice.message?.tool_calls) {
     console.log("choice.message.tool_calls", choice.message.tool_calls);
+    let assistantTextFromMcp: string | undefined;
     for (const toolCall of choice.message.tool_calls) {
       // Narrow: we only care about function calls
       if (toolCall.type === "function") {
@@ -237,10 +238,48 @@ User says: "${userText}"`,
             tool_call_id: toolCall.id,
             content: JSON.stringify(result),
           });
+
+          // Convert MCP JSON result to a natural language response for the chat body
+          try {
+            const verbalizationMessages: ChatCompletionMessageParam[] = [
+              {
+                role: "system",
+                content:
+                  "You convert tool JSON outputs into concise, clear, user-friendly natural language updates. Do not include code blocks or raw JSON. If relevant, summarize key fields with short bullet points.",
+              },
+              {
+                role: "user",
+                content: `User request: ${userText}\n\nTool name: ${
+                  fn.name
+                }\nTool arguments: ${JSON.stringify(
+                  args
+                )}\n\nRaw tool result JSON: ${JSON.stringify(result)}`,
+              },
+            ];
+
+            const verbalization = await openai.chat.completions.create({
+              model,
+              messages: verbalizationMessages,
+              temperature: 0.2,
+            });
+            const natural =
+              verbalization.choices?.[0]?.message?.content?.trim();
+            if (natural) {
+              assistantTextFromMcp = assistantTextFromMcp
+                ? `${assistantTextFromMcp}\n\n${natural}`
+                : natural;
+            }
+          } catch (verbalizeErr) {
+            console.error("Failed to verbalize MCP result", verbalizeErr);
+          }
         } catch (err) {
           console.error(`❌ Failed to call tool ${fn.name}`, err);
         }
       }
+    }
+    // Attach MCP natural language output (if any) so later selection prefers it
+    if (assistantTextFromMcp) {
+      messages.push({ role: "assistant", content: assistantTextFromMcp });
     }
   }
 
@@ -322,6 +361,15 @@ User says: "${userText}"`,
       choice.message?.content ||
       assistantTextFromTool ||
       `Thanks! Next, could you share ${nextField}?`;
+  }
+
+  // If we generated a natural language explanation from an MCP tool, prefer showing that
+  const lastAssistantMessage = messages[messages.length - 1];
+  if (
+    lastAssistantMessage?.role === "assistant" &&
+    lastAssistantMessage?.content
+  ) {
+    assistantText = lastAssistantMessage.content as string;
   }
 
   await upsertProjectState({

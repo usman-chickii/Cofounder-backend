@@ -177,7 +177,7 @@ export async function callMcpTool(
   args: Record<string, any>
 ): Promise<any> {
   const sessionId = await ensureMcpSession(userId);
-  console.log("args in mcp function", args);
+  // console.log("args in mcp function", args);
 
   const result = await mcpPost(
     {
@@ -191,6 +191,7 @@ export async function callMcpTool(
     },
     sessionId
   );
+  console.log("result in call", result.result.result.content);
 
   return result?.result?.content ?? result?.result ?? result;
 }

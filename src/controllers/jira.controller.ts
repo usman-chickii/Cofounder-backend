@@ -1,25 +1,22 @@
-// src/controllers/jira.controller.ts
 import { Request, Response } from "express";
-import { createJiraProjectTool } from "../services/jira.service";
+import { generateJiraTasks } from "../services/jira.service";
 
-export async function createJiraBoard(req: Request, res: Response) {
+export async function generateJiraTasksController(req: Request, res: Response) {
   try {
-    const { brdContent, projectKey } = req.body;
+    const { projectId } = req.params;
+    const userId = (req as any).user.id;
+    const result = await generateJiraTasks(userId, projectId);
 
-    if (!brdContent || !projectKey)
-      return res
-        .status(400)
-        .json({ error: "BRD content and projectKey required" });
-
-    const result = await createJiraProjectTool(brdContent, projectKey);
-
-    res.json({
+    res.status(200).json({
       success: true,
-      message: "Jira board created successfully",
-      data: result,
+      message: `Created ${result.created} Jira issues`,
+      data: result.details,
     });
-  } catch (err: any) {
-    console.error("Error creating Jira board:", err);
-    res.status(500).json({ success: false, error: err.message });
+  } catch (error: any) {
+    console.error("Error generating Jira tasks:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message || "Failed to generate Jira tasks",
+    });
   }
 }

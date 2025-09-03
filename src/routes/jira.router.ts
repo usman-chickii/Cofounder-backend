@@ -1,9 +1,14 @@
 // src/routes/jira.routes.ts
 import { Router } from "express";
-import { createJiraBoard } from "../controllers/jira.controller";
+import { generateJiraTasksController } from "../controllers/jira.controller";
+import { authMiddleware } from "../middleware/auth.middleware";
 
 const router = Router();
 
-router.post("/create-board", createJiraBoard);
+router.post(
+  "/generate-jira-tasks/:projectId",
+  authMiddleware,
+  generateJiraTasksController
+);
 
 export default router;
