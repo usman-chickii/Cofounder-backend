@@ -1,6 +1,11 @@
 // src/services/mcp.service.ts
 import fetch from "node-fetch";
 import { ENV } from "../config/env";
+import {
+  getUserAuthFromDb,
+  refreshAtlassianToken,
+  updateUserAuthInDb,
+} from "./atlassianAuth.service";
 
 const MCP_SERVER_URL = ENV.MCP_SERVER_URL || "http://localhost:9000/mcp";
 
@@ -77,18 +82,45 @@ async function parseSSEOrJSON(response: any): Promise<any> {
 
 async function mcpPost(
   payload: Record<string, any>,
+  userId?: string,
   sessionId?: string
 ): Promise<any> {
+  const auth = userId ? await getUserAuthFromDb(userId) : undefined;
+
+  if (userId && !auth) {
+    throw new Error(`No Atlassian OAuth credentials found for user ${userId}`);
+  }
+  const now = new Date();
+  if (auth.expiresAt && new Date(auth.expiresAt) <= now) {
+    const refreshedToken = await refreshAtlassianToken(auth.refreshToken);
+    auth.token = refreshedToken.access_token;
+    auth.expiresAt = new Date(
+      new Date().getTime() + refreshedToken.expires_in * 1000
+    ).toISOString();
+    await updateUserAuthInDb(userId, auth.token, auth.expiresAt);
+  }
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    Accept: "application/json, text/event-stream",
+    ...(sessionId ? { "MCP-Session-Id": sessionId } : {}),
+    ...(auth
+      ? {
+          Authorization: `Bearer ${auth.token}`,
+          "X-Atlassian-Cloud-Id": auth.cloudId ?? "",
+        }
+      : {}),
+  };
+
+  console.log("mcpPost payload", payload);
+
   const response = await fetch(MCP_SERVER_URL, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...(sessionId ? { "MCP-Session-Id": sessionId } : {}),
-      Accept: "application/json, text/event-stream",
-    },
+    headers,
     body: JSON.stringify(payload),
   });
   const sessionIdResponse = response.headers.get("MCP-Session-Id");
+  console.log(sessionId);
+  console.log("sessionIdResponse", sessionIdResponse);
 
   const result = await parseSSEOrJSON(response);
   if (!sessionIdResponse) {
@@ -101,15 +133,29 @@ async function mcpPost(
 async function mcpNotify(
   method: string,
   params: Record<string, any> = {},
+  userId?: string,
   sessionId?: string
 ): Promise<void> {
+  const auth = userId ? await getUserAuthFromDb(userId) : undefined;
+  if (userId && !auth) {
+    throw new Error(`No Atlassian OAuth credentials found for user ${userId}`);
+  }
+
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    Accept: "application/json, text/event-stream",
+    ...(sessionId ? { "MCP-Session-Id": sessionId } : {}),
+    ...(auth
+      ? {
+          Authorization: `Bearer ${auth.token}`,
+          "X-Atlassian-Cloud-Id": auth.cloudId ?? "",
+        }
+      : {}),
+  };
+
   const resp = await fetch(MCP_SERVER_URL, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...(sessionId ? { "MCP-Session-Id": sessionId } : {}),
-      Accept: "application/json, text/event-stream",
-    },
+    headers,
     body: JSON.stringify({
       jsonrpc: "2.0",
       method,
@@ -136,12 +182,15 @@ export async function ensureMcpSession(userId: string): Promise<string> {
     return mcpSessions[userId].sessionId;
   }
 
-  const result = await mcpPost({
-    jsonrpc: "2.0",
-    id: 1,
-    method: "initialize",
-    params: {},
-  });
+  const result = await mcpPost(
+    {
+      jsonrpc: "2.0",
+      id: 1,
+      method: "initialize",
+      params: {},
+    },
+    userId
+  );
 
   const sessionId = result?.result?.sessionId || result?.sessionId || undefined;
 
@@ -155,15 +204,9 @@ export async function ensureMcpSession(userId: string): Promise<string> {
 
   if (result?.result?.error?.code === -32602) {
     console.log("MCP tools listed in listMcpTools failed, retrying");
-    //   await mcpNotify("notifications/initialize", {}, sessionId);
-    await mcpNotify("notifications/initialized", {}, sessionId);
+    await mcpNotify("notifications/initialized", {}, userId, sessionId);
     return sessionId;
   }
-
-  // Atlassian MCP expects a notifications handshake after initialize
-  //   await mcpNotify("notifications/initialize", {}, sessionId);
-  // If your server expects the LSP-like name instead, uncomment:
-  // await mcpNotify("notifications/initialized", {}, sessionId);
 
   return sessionId;
 }
@@ -177,7 +220,7 @@ export async function callMcpTool(
   args: Record<string, any>
 ): Promise<any> {
   const sessionId = await ensureMcpSession(userId);
-  // console.log("args in mcp function", args);
+  console.log("args in mcp function", args);
 
   const result = await mcpPost(
     {
@@ -185,12 +228,30 @@ export async function callMcpTool(
       id: 1,
       method: "tools/call",
       params: {
-        name: tool,
-        arguments: args,
+        name: "jira_create_issue",
+        arguments: {
+          project_key: "MCPTEST2", // Must match an existing Jira project key
+          summary: "Test Issue from MCP",
+          issue_type: "Task", // Must be valid in the project
+          description: "This is a dummy issue for testing MCP integration.",
+        },
       },
     },
+    userId,
     sessionId
   );
+  // const result = await mcpPost(
+  //   {
+  //     jsonrpc: "2.0",
+  //     id: 1,
+  //     method: "tools/list",
+  //   },
+  //   userId,
+  //   sessionId
+  // );
+
+  // console.log(result.result.result);
+
   console.log("result in call", result.result.result.content);
 
   return result?.result?.content ?? result?.result ?? result;
@@ -210,6 +271,7 @@ export async function listMcpTools(userId: string): Promise<any> {
         method: "tools/list",
         params: {},
       },
+      userId,
       sessionId
     );
     // console.log("MCP tools listed in listMcpTools", result.result.result.tools);

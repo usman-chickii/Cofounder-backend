@@ -12,7 +12,7 @@ import profileRouter from "./routes/profile.router";
 import chatRouter from "./routes/chat.router";
 import jiraRouter from "./routes/jira.router";
 import mcpRouter from "./routes/mcp.router";
-
+import integrationsRouter from "./routes/integrations.router";
 const app = express();
 
 app.use(cors({ origin: "http://localhost:8080", credentials: true }));
@@ -27,6 +27,7 @@ app.use("/api/profile", profileRouter);
 app.use("/api/chat", chatRouter);
 app.use("/api/jira", jiraRouter);
 app.use("/api/mcp", mcpRouter);
+app.use("/api/integrations", integrationsRouter);
 
 app.get("/", (req, res) => {
   res.send("Testing default route");
