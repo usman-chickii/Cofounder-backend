@@ -15,7 +15,10 @@ export async function createProjectBlock(
 ) {
   const { data, error } = await supabase
     .from("project_blocks")
-    .insert({ project_id: projectId, ...block })
+    .upsert(
+      { project_id: projectId, ...block },
+      { onConflict: "project_id,type" }
+    )
     .select()
     .single();
 
@@ -43,4 +46,17 @@ export async function getProjectBlockByIdDB(blockId: string) {
 
   if (error) throw error;
   return data;
+}
+
+export async function getBrd(projectId: string) {
+  console.log("get brd");
+  const { data, error } = await supabase
+    .from("project_blocks")
+    .select("id, type")
+    .eq("project_id", projectId)
+    .eq("type", "brd");
+
+  console.log("blocks for project", projectId, data);
+  if (error) throw error;
+  return data && data.length > 0 ? data[0] : null;
 }

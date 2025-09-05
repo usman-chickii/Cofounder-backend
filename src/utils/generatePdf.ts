@@ -6,7 +6,6 @@ export async function generatePdf(
 ): Promise<Buffer> {
   // 1. Convert markdown → PDF
 
-  console.log("markdown from generatePdf is:", markdown);
   const pdf = await mdToPdf(
     { content: markdown },
     {

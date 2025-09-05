@@ -15,6 +15,8 @@ import {
   downloadDocument,
   saveDocumentInProjectBlock,
 } from "../controllers/document.controller";
+import { getState } from "../controllers/state.controller";
+import { getBrdController } from "../controllers/projectBlock.controller";
 
 const router = Router();
 
@@ -36,5 +38,8 @@ router.post(
 );
 router.get("/:projectId/blocks", authMiddleware, getProjectBlocks);
 router.delete("/:projectId", deleteProject);
+
+router.get("/:projectId/state", authMiddleware, getState);
+router.get("/:projectId/brd", authMiddleware, getBrdController);
 
 export default router;

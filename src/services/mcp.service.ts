@@ -90,25 +90,25 @@ async function mcpPost(
   if (userId && !auth) {
     throw new Error(`No Atlassian OAuth credentials found for user ${userId}`);
   }
-  const now = new Date();
-  if (auth.expiresAt && new Date(auth.expiresAt) <= now) {
-    const refreshedToken = await refreshAtlassianToken(auth.refreshToken);
-    auth.token = refreshedToken.access_token;
+  // const now = new Date();
+  // if (auth.expiresAt && new Date(auth.expiresAt) <= now) {
+  //   const refreshedToken = await refreshAtlassianToken(auth.refreshToken);
+  //   auth.token = refreshedToken.access_token;
 
-    auth.expiresAt = new Date(
-      new Date().getTime() + refreshedToken.expires_in * 1000
-    ).toISOString();
+  //   auth.expiresAt = new Date(
+  //     new Date().getTime() + refreshedToken.expires_in * 1000
+  //   ).toISOString();
 
-    if (refreshedToken.refresh_token) {
-      auth.refreshToken = refreshedToken.refresh_token;
-    }
-    await updateUserAuthInDb(
-      userId,
-      auth.token,
-      auth.refreshToken,
-      auth.expiresAt
-    );
-  }
+  //   if (refreshedToken.refresh_token) {
+  //     auth.refreshToken = refreshedToken.refresh_token;
+  //   }
+  //   await updateUserAuthInDb(
+  //     userId,
+  //     auth.token,
+  //     auth.refreshToken,
+  //     auth.expiresAt
+  //   );
+  // }
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     Accept: "application/json, text/event-stream",
@@ -245,19 +245,6 @@ export async function callMcpTool(
     userId,
     sessionId
   );
-  // const result = await mcpPost(
-  //   {
-  //     jsonrpc: "2.0",
-  //     id: 1,
-  //     method: "tools/list",
-  //   },
-  //   userId,
-  //   sessionId
-  // );
-
-  // console.log(result.result.result);
-
-  console.log("result in call", result.result.result.content);
 
   return result?.result?.content ?? result?.result ?? result;
 }

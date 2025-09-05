@@ -13,7 +13,6 @@ interface JiraIssuePayload {
 export async function getJiraProjects(userId: string) {
   try {
     const projects = await callMcpTool(userId, "jira_get_all_projects", {});
-    console.log("projects", projects.result.content);
     const projectText = projects.result.content[0].text;
     let projectList = [];
 

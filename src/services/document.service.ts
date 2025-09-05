@@ -398,11 +398,12 @@ export async function downloadDocumentService(
   blockId: string
 ): Promise<{ url: string }> {
   const block = await getProjectBlockByIdDB(blockId);
+  console.log("block", block);
   if (!block || block.project_id !== projectId) {
     throw new Error("Document not found for this project");
   }
 
-  const filePath = `projects/${projectId}/documents/${blockId}.pdf`;
+  const filePath = `projects/${projectId}/documents/${blockId}-${block.updated_at}.pdf`;
 
   // 1. Try to fetch existing file
   const { error: downloadErr } = await supabase.storage
