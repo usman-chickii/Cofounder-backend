@@ -94,10 +94,20 @@ async function mcpPost(
   if (auth.expiresAt && new Date(auth.expiresAt) <= now) {
     const refreshedToken = await refreshAtlassianToken(auth.refreshToken);
     auth.token = refreshedToken.access_token;
+
     auth.expiresAt = new Date(
       new Date().getTime() + refreshedToken.expires_in * 1000
     ).toISOString();
-    await updateUserAuthInDb(userId, auth.token, auth.expiresAt);
+
+    if (refreshedToken.refresh_token) {
+      auth.refreshToken = refreshedToken.refresh_token;
+    }
+    await updateUserAuthInDb(
+      userId,
+      auth.token,
+      auth.refreshToken,
+      auth.expiresAt
+    );
   }
   const headers: Record<string, string> = {
     "Content-Type": "application/json",

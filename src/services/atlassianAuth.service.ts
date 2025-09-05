@@ -63,13 +63,15 @@ export async function getUserAuthFromDb(
  */
 export async function updateUserAuthInDb(
   userId: string,
-  newToken: string,
+  newAccessToken: string,
+  newRefreshToken: string,
   newExpiry: string
 ) {
   const { error } = await supabase
     .from("user_integration_connections")
     .update({
-      access_token: newToken,
+      access_token: newAccessToken,
+      refresh_token: newRefreshToken,
       expires_at: newExpiry,
     })
     .eq("user_id", userId)
@@ -81,16 +83,16 @@ export async function updateUserAuthInDb(
 }
 
 export async function refreshAtlassianToken(refreshToken: string) {
-  const params = new URLSearchParams();
-  params.append("grant_type", "refresh_token");
-  params.append("client_id", ENV.ATLASSIAN_CLIENT_ID);
-  params.append("client_secret", ENV.ATLASSIAN_CLIENT_SECRET);
-  params.append("refresh_token", refreshToken);
-
+  console.log("refreshAtlassianToken", refreshToken);
   const resp = await fetch("https://auth.atlassian.com/oauth/token", {
     method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: params,
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      grant_type: "refresh_token",
+      client_id: ENV.ATLASSIAN_CLIENT_ID,
+      client_secret: ENV.ATLASSIAN_CLIENT_SECRET,
+      refresh_token: refreshToken,
+    }),
   });
 
   if (!resp.ok) {
