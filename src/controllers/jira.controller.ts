@@ -7,6 +7,8 @@ import { UserIntegration } from "src/types/integration";
 export async function getJiraProjectsController(req: Request, res: Response) {
   try {
     const userId = (req as any).user.id;
+    console.log("in getJiraProjectsController");
+    console.log("userId", userId);
     const result = await getJiraProjects(userId);
     res.status(200).json({
       success: true,
@@ -26,7 +28,9 @@ export async function generateJiraTasksController(req: Request, res: Response) {
   try {
     const { projectId } = req.params;
     const userId = (req as any).user.id;
-    const result = await generateJiraTasks(userId, projectId);
+    const projectKey = req.body.jiraProjectKey;
+    console.log("projectKey", projectKey);
+    const result = await generateJiraTasks(userId, projectId, projectKey);
 
     res.status(200).json({
       success: true,

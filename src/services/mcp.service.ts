@@ -228,13 +228,8 @@ export async function callMcpTool(
       id: 1,
       method: "tools/call",
       params: {
-        name: "jira_create_issue",
-        arguments: {
-          project_key: "MCPTEST2", // Must match an existing Jira project key
-          summary: "Test Issue from MCP",
-          issue_type: "Task", // Must be valid in the project
-          description: "This is a dummy issue for testing MCP integration.",
-        },
+        name: tool,
+        arguments: args,
       },
     },
     userId,
